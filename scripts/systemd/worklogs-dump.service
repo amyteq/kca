@@ -1,0 +1,21 @@
+[Unit]
+Description=Retired transcript publisher (no-op; disable its timer)
+Documentation=https://github.com/amyteq/tt_pangu/blob/main/docs/tooling/worklogs-systemd-timer.md
+# Retained for existing installations only; the script performs no network or Git writes.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# %h expands to the invoking user's home. Adjust WORKLOG_REPO_DIR below if your
+# checkout lives elsewhere; the script defaults to ~/test/tt_pangu.
+WorkingDirectory=%h/test/tt_pangu
+ExecStart=%h/test/tt_pangu/scripts/worklogs_dump.sh
+TimeoutStartSec=2400
+
+# Optional overrides — uncomment/edit as needed (see the script header):
+# Environment=WORKLOG_REPO_DIR=%h/test/tt_pangu
+# Environment=WORKLOG_MAMBA_ENV=v3.12.12
+
+[Install]
+WantedBy=default.target

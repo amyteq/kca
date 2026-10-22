@@ -1,0 +1,57 @@
+# Competition runner: kaggle_submit allowed only in approved modes.
+- operation: kaggle_submit
+  default_decision: ask
+  reason: Default to ask; allow only in finalization or human-approved modes.
+  allowed_in_modes:
+    - competition-finalization
+    - human-approved
+  audit_required: true
+- operation: kaggle_push
+  default_decision: ask
+  reason: Kernel push remains gated outside finalization mode.
+  allowed_in_modes:
+    - competition-finalization
+  audit_required: true
+- operation: supabase_migrate
+  default_decision: ask
+  audit_required: true
+- operation: budget_exceeded
+  default_decision: deny
+  reason: Never allow execution once the job budget is exhausted.
+- operation: gh_pr_merge
+  default_decision: ask
+  audit_required: true
+- operation: bash
+  default_decision: ask
+- operation: read_file
+  default_decision: allow
+- operation: write_file
+  default_decision: allow
+- operation: edit_file
+  default_decision: allow
+- operation: create_artifact
+  default_decision: allow
+- operation: run_tests
+  default_decision: allow
+- operation: litellm_call
+  default_decision: allow
+# M11 — CTF approval operations (ADR-0017). In competition-runner,
+# challenge_run may resolve to `allow` under conditional_allow.when_in_scope
+# (worker holds an in-scope target URL). flag_submit stays on `ask`
+# unconditionally — highest-blast-radius op.
+- operation: challenge_run
+  default_decision: ask
+  reason: Executing a solver against an authorized CTF target.
+  audit_required: true
+  conditional_allow:
+    when_in_scope: allow   # if request URL ∈ ctf_scopes.target_urls
+- operation: flag_submit
+  default_decision: ask
+  reason: Flag submission to a CTF event API — never auto-allow.
+  audit_required: true
+- operation: network_egress
+  default_decision: deny
+  reason: Egress outside ctf_scopes.target_urls is denied; widen scope row to allow.
+  audit_required: true
+  conditional_allow:
+    when_in_scope: ask   # if request URL ∈ ctf_scopes.target_urls

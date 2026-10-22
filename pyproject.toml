@@ -1,0 +1,77 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tt-pangu"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "psycopg[binary]>=3.1",
+    "python-dotenv>=1.0",
+    "nbformat>=5.9",
+    "PyYAML>=6.0",
+    "requests>=2.28",
+    "beautifulsoup4>=4.12",
+    "pyright>=1.1.410",
+]
+
+[project.optional-dependencies]
+llm = ["litellm>=1.40"]
+# ruff is pinned (not >=) so the local format_gate hook and the CI
+# `ruff lint + format check` job always agree — an unpinned bump (e.g.
+# 0.14->0.15 reflowed multi-line lambda bodies) silently passed locally but
+# failed CI. Bump CI (.github/workflows/test.yml) and this line together.
+dev = ["pytest>=8", "ruff==0.15.14", "jsonschema>=4.21"]
+# Required by the M13 Kaggle-replay eval suites (kaggle_replay_titanic /
+# kaggle_replay_spaceship_titanic / kaggle_replay_house_prices). Lean
+# install (`.[dev]`) keeps these out; CI installs `.[dev,eval]` so the
+# suites can register and run.
+eval = ["numpy>=1.26", "pandas>=2.0", "scikit-learn>=1.4"]
+
+[project.scripts]
+kca = "tools.kca.kca:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tools*", "src*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "basic"
+include = ["src", "tests", "services", "tools"]
+exclude = [
+    "**/.*",
+    "**/node_modules", 
+    "**/__pycache__",
+    ".venv",
+    ".ruff_cache",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+# ruff only lints/formats Python — Markdown (Claude skill definitions, worklog
+# dumps, docs) is never touched by it. worklogs/ holds generated session dumps;
+# exclude it so a stray file there can never trip the linter / CI / pre-push gate.
+
+[tool.ruff.lint]
+select = ["F"]
+ignore = [
+  "E501",   # line-too-long
+  "F841",   # Local variable `...` is assigned to but never used
+]
+
+[tool.ruff.format]
+# sec-attack is a closed competition and this notebook has already been pushed to
+# Kaggle; reformatting a kernel that shipped cannot be re-verified against the
+# competition and buys nothing. Scoped to the formatter on purpose — `ruff check`
+# still lints the file, which a top-level [tool.ruff] exclude would prevent.
+exclude = ["competitions/sec-attack/kernels/sec-attack-jed.ipynb"]
+# quote-style = "preserve"
+# indent-style = "space"
+# line-ending = "auto"

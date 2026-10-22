@@ -1,0 +1,215 @@
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch: 
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SELF_HOSTED_PYTHON_BIN: /home/gha-runner/micromamba/envs/v3.12.12/bin
+
+jobs:
+  no-db:
+    name: no-db pytest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Python on GitHub-hosted
+        if: ${{ runner.environment == 'github-hosted' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Use micromamba Python on self-hosted Arch
+        if: ${{ runner.environment == 'self-hosted' }}
+        run: |
+          echo "$SELF_HOSTED_PYTHON_BIN" >> "$GITHUB_PATH"
+          "$SELF_HOSTED_PYTHON_BIN/python" --version
+          "$SELF_HOSTED_PYTHON_BIN/python" -m pip --version
+
+      - name: reject credentials and transcript exports
+        run: python scripts/check_public_source.py
+
+      - name: install
+        run: pip install -e ".[dev,eval]" fastapi httpx
+
+      # ADR-0023: validate every real ledger record under competitions/ against
+      # contracts/, and fail when an entity has no record at all. READ_ONLY, no DB,
+      # no network. tests/test_contracts.py covers the same ground; this step exists
+      # so a broken record shows up as its own named check.
+      - name: kca contracts validate
+        run: python tools/kca/kca.py contracts validate --require-all-entities
+
+      - name: pytest (no DB)
+        run: python -m pytest tests/ services/decision_api/tests -v
+
+  live-db:
+    name: live-db pytest
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      || (github.event_name == 'pull_request'
+          && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # SUPABASE_DB_URL: postgres://postgres:postgres@localhost:5432/postgres
+      KCA_DB_TARGET: local
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: export local Postgres DSN
+        env:
+          PGPORT: ${{ job.services.postgres.ports[5432] }}
+        run: |
+          echo "SUPABASE_DB_URL=postgres://postgres:postgres@localhost:${PGPORT}/postgres" >> "$GITHUB_ENV"
+          echo "Postgres mapped to localhost:${PGPORT}"
+
+      - name: verify Postgres
+        run: |
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -c "select version();"
+
+      - name: confirm secrets reachable
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::warning::SUPABASE_DB_URL secret missing — skipping live-db."
+            exit 0
+          fi
+
+      - name: Setup Python on GitHub-hosted
+        if: ${{ runner.environment == 'github-hosted' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Use micromamba Python on self-hosted Arch
+        if: ${{ runner.environment == 'self-hosted' }}
+        run: |
+          echo "$SELF_HOSTED_PYTHON_BIN" >> "$GITHUB_PATH"
+          "$SELF_HOSTED_PYTHON_BIN/python" --version
+          "$SELF_HOSTED_PYTHON_BIN/python" -m pip --version
+
+      - name: install
+        run: pip install -e ".[dev,eval]" fastapi httpx
+
+      - name: apply migrations
+        run: |
+          # Glob `000*.sql` was pre-M13 and matched 0001-0009 only;
+          # `0[0-9]*_*.sql` covers 0001-0099 and stays sorted lexically
+          # so apply order matches the numeric prefix.
+          for f in supabase/migrations/0[0-9]*_*.sql; do
+            psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"
+          done
+
+      - name: pytest (live DB)
+        run: python -m pytest tests/ services/decision_api/tests -v
+
+  lint:
+    name: ruff lint + format check
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python on GitHub-hosted
+        if: ${{ runner.environment == 'github-hosted' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Use micromamba Python on self-hosted Arch
+        if: ${{ runner.environment == 'self-hosted' }}
+        run: |
+          echo "$SELF_HOSTED_PYTHON_BIN" >> "$GITHUB_PATH"
+          "$SELF_HOSTED_PYTHON_BIN/python" --version
+          "$SELF_HOSTED_PYTHON_BIN/python" -m pip --version
+
+      - name: install ruff
+        # Pinned to match pyproject [dev] + the local format_gate hook; bump
+        # all three together (an unpinned bump can pass locally, fail here).
+        run: pip install ruff==0.15.14 pyright==1.1.410
+
+      - name: ruff check
+        run: ruff check .
+
+      - name: ruff format --check
+        run: ruff format --check .
+
+      # pyright currently report many errors, need to re-introduce it later to ensure code quality
+      # - name: pyright
+      #   run: pyright
+
+  md-wrap:
+    name: markdown soft wrap (ADR-0024)
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    # This job installs nothing on purpose, and a test pins that: the checker
+    # imports only the standard library. It reports and never writes, so there
+    # is no mode here that needs a package.
+    steps:
+      # fetch-depth: 0 so `--changed` has a merge base to diff against.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python on GitHub-hosted
+        if: ${{ runner.environment == 'github-hosted' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Use micromamba Python on self-hosted Arch
+        if: ${{ runner.environment == 'self-hosted' }}
+        run: |
+          echo "$SELF_HOSTED_PYTHON_BIN" >> "$GITHUB_PATH"
+          "$SELF_HOSTED_PYTHON_BIN/python" --version
+
+      # The agent-context files are checked on every run, whether or not this
+      # change touches them: a wrap defect there costs every agent session.
+      - name: allowlist
+        run: python scripts/check_md_wrap.py --allowlist
+
+      # Everything else is gated only as a pull request touches it. The historical
+      # backfill was declined deliberately — see ADR-0024 "Enforcement" and #210.
+      - name: changed files
+        if: ${{ github.event_name == 'pull_request' }}
+        run: python scripts/check_md_wrap.py --changed "origin/${{ github.base_ref }}"
+
+  ui:
+    name: ui build + lint + typecheck + test
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    env:
+      PLAYWRIGHT_CHROMIUM_PATH: /usr/bin/chromium
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+      - name: install
+        run: pnpm -C ui install --frozen-lockfile
+      - name: lint
+        run: pnpm -C ui lint
+      - name: typecheck
+        run: pnpm -C ui typecheck
+      - name: build
+        run: pnpm -C ui build
+      - name: test
+        run: pnpm -C ui run test --run

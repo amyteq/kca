@@ -1,0 +1,25 @@
+# Local arena/replay/log artifacts — keep code, not bulk outputs.
+replays/
+logs/
+*.json.gz
+__pycache__/
+
+*.tar.gz
+
+# Vendored third-party opponent (reconstruct via arena/_reconstruct_pkg.py from the public notebook)
+agent/versions/kuni05/
+
+# Vendored third-party gate opponents (reconstruct via arena/_extract_pub.py from public notebooks)
+agent/versions/suite/
+
+# T16 measurement: generated instrumented twin (regenerate with arena/_make_measure.py)
+agent/versions/forecast_measure.py
+
+# Live-loop transient state (no secrets; per-task-run counters)
+live/budget_state.json
+
+# Replay dataset / model artifacts (OW-P1-DATASET-001) — keep scripts/schema/reports, not bulk data
+datasets/artifacts/
+datasets/cache/
+datasets/fixtures/*.json
+models/artifacts/

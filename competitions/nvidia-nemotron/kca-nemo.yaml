@@ -1,0 +1,261 @@
+# Per-competition kernel config — single source of truth for ALL nemo variants.
+#
+# Modelled on tools/legacy/kkr.yaml: `_base` holds shared fields; each section
+# overrides only what differs. `kernel-metadata.json` is generated on the fly at
+# push/submit time (not source-controlled) via:
+#
+#   python tools/kca/yaml_meta.py build competitions/nvidia-nemotron/kca-nemo.yaml <section> \
+#       --src-dir competitions/nvidia-nemotron/kernels --out <build_dir>
+#   python tools/kca/kca.py kaggle push --kernel-dir <build_dir> --no-watch
+#   # on COMPLETE:
+#   python tools/kca/kca.py kaggle submit --competition nvidia-nemotron-model-reasoning-challenge \
+#       --kernel <id> --version <v> --file submission.zip --message "..."
+#
+# `id` carries the account (harrysun2006 = "harry", firefly2006 = "may"); per-team
+# submission quota (5/day) is shared across both accounts.
+#
+# Annotation keys (lb / schedule / note) are ignored by the metadata generator;
+# they document results and the run cadence (see README "Scheduling").
+
+_base:
+  competition: nvidia-nemotron-model-reasoning-challenge
+  submit_file: submission.zip
+  submit_type: notebook
+  language: python
+  kernel_type: notebook
+  is_private: true
+  enable_gpu: true
+  enable_tpu: false
+  enable_internet: false
+  keywords: [gpu]
+  competition_sources: [nvidia-nemotron-model-reasoning-challenge]
+  dataset_sources:
+    - mayukh18/nemotron-packages
+    - llkh0a/rtx-wheels
+    - huikang/huikang-nemotron-repository-snapshot
+    - mohamedamr992/replay-math
+  kernel_sources: []
+  model_sources: [metric/nemotron-3-nano-30b-a3b-bf16/Transformers/default/1]
+  docker_image: gcr.io/kaggle-private-byod/python@sha256:9fa0da194fad2241d3f01a80581cbecbd3a258b4d1b695e2cbbbc62a0fd205ac
+  machine_shape: NvidiaRtxPro6000
+
+  # Per-competition autonomy (ADR-0021). Default ON: KCA pushes/submits without
+  # per-action approval once `screen` passes; flip `enabled: false` for strict
+  # human-in-the-loop. NOTE: an annotation key for now (like lp/note) — the
+  # metadata generator ignores it; runtime enforcement is the ADR-0021 follow-up.
+  #
+  # ADR-0022 §5 widens this model, but only once a competition meets its
+  # activation conditions (A1-A7). This competition closed 2026-06-15 and is in state
+  # FINDINGS, so it never activates: the values below keep their ADR-0021 meaning
+  # (all four `screen` criteria gate; `daily_submit_budget` caps).
+  autonomy:
+    enabled: true
+    auto_push: true
+    auto_submit: true
+    daily_submit_budget: 5         # per-team quota, shared across both accounts
+    screen:                        # ALL must pass for an autonomous SUBMIT
+      beats_best: true             # beat current best on trusted local validation
+      min_margin: 0.0
+      require_repro: true          # seed + artifact path + exact command recorded
+      rules_check: true            # rules / submission-limit / no-leakage check passed
+    human_gated:                   # ADDITIVE to the built-in floor, not the whole list:
+                                   # ADR-0021 §2's always-gated set applies whether or not
+                                   # it is repeated here, and cannot be shortened by config.
+      - final_promotion_near_deadline
+      - irreversible_delete
+      - over_budget_spend
+      - ambiguous_rule
+      - new_terms_or_team_change
+      - final_submission_selection   # whenever the choice is made, not only near the deadline
+      - external_data_or_data_policy  # adopting external data / expanding beyond comp data
+
+# --- baseline / early SFT kernel (v5–v7, dgxchen CoT corpus) ------------------
+baseline:
+  id: harrysun2006/nemotron-lora-baseline-kca
+  title: Nemotron LoRA Baseline (KCA)
+  code_file: nemotron-lora-baseline.ipynb
+  dataset_sources: [dgxchen/nemotron-cot-tong]
+  kernel_sources: [ryanholbrook/nvidia-utility-script]
+  note: "v5 answer-only 0.61 / v7 response-masked CoT 0.65 / ctx4k 0.67 / ctx2k 0.42"
+  schedule: overnight
+
+# --- v10: rule-aware CoT (firefly2006 / may) ----------------------------------
+v10:
+  id: firefly2006/nemo-rule4k-v10
+  title: Nemo Rule4k V10
+  code_file: nemo-rule4k-v10.ipynb
+  dataset_sources: [dgxchen/nemotron-cot-tong]
+  kernel_sources: [ryanholbrook/nvidia-utility-script]
+  lb: 0.59
+  schedule: overnight
+
+# --- v14: public replay recipe — BEST (harrysun2006 / harry) ------------------
+v14:
+  id: harrysun2006/nemo-replay-v14
+  title: Nemo Replay V14
+  code_file: nemo-replay-v14.ipynb
+  lb: 0.85
+  schedule: overnight
+
+# --- v15: v14 backbone + cryptarithm synth ------------------------------------
+v15:
+  id: harrysun2006/nemo-synth-v15
+  title: Nemo Synth V15
+  code_file: nemo-synth-v15.ipynb
+  lb: 0.84
+  schedule: overnight
+
+# --- v16-evalfix: LB25 borrows on the v14 backbone (post-deadline, harry) ------
+# Eval/submission parity preflight (LEVER 1) + reorganized own-solver-verified bit
+# CoT woven ~2% (LEVER 2) + min-logprob selective replay of the hardest non-replay
+# rows (LEVER 3). Phase A (v14 replay) -> Phase B (short replay pass); all phases
+# wall-clock guarded. Measured on the late-submission window (100/day).
+v16_evalfix:
+  id: harrysun2006/nemo-v16-evalfix
+  title: Nemo V16 Evalfix
+  code_file: nemo-v16-evalfix.ipynb
+  note: "v14 backbone + LB25 borrows: eval-parity preflight, verified bit CoT (~157 rows), min-logprob replay (hardest 15%); LB25 plan"
+  schedule: overnight
+
+# --- v17-discovery: LB80 Part A equation discovery-CoT (post-deadline, may) ----
+# Cracked equation cipher = per-operator digit-string transforms; forward-executable
+# discovery CoT on the plaintext-digit subset (180 verified rows) woven ~2% into the
+# v14 backbone. Glyph-ciphered ~82% skipped (joint crack open). v17-dpo deferred
+# (needs external sm_90+ GPU, #83). On firefly2006 to run concurrently with v16.
+v17_discovery:
+  id: firefly2006/nemo-v17-discovery
+  title: Nemo V17 Discovery
+  code_file: nemo-v17-discovery.ipynb
+  note: "equation discovery-CoT (per-operator string-op crack, 180 verified plaintext-digit rows, dose 0.15) on v14 backbone; LB80 Part A"
+  schedule: overnight
+
+# --- v18-stable: LB92 borrows (post-deadline, harry) --------------------------
+# LEVER 1 grad-clip 1.5 (variance fix) + LEVER 3 verified synthetic equation data
+# (cracked rule family, synth:original 0.1) on the v14 backbone. LEVER 2 per-char
+# tokenization dropped (infeasible for an adapter-only grader).
+v18_stable:
+  id: harrysun2006/nemo-v18-stable
+  title: Nemo V18 Stable
+  code_file: nemo-v18-stable.ipynb
+  note: "v14 backbone + grad-clip 1.5 + verified synth equation (rule-family, ratio 0.1); LB92 plan (per-char tok dropped)"
+  schedule: overnight
+
+# --- t7: multi-adapter SVD merge (CPU passthrough; short, daytime) ------------
+merge_t7:
+  id: harrysun2006/nemo-merge-t7
+  title: Nemo Merge T7
+  code_file: nemo-merge-t7.ipynb
+  enable_gpu: false
+  machine_shape: null            # CPU passthrough
+  dataset_sources: [harrysun2006/nemo-merge-t7-adapter]
+  model_sources: []
+  lb: 0.82
+  schedule: daytime
+
+# --- B: low-dose cryptarithm synth (firefly2006 / may) ------------------------
+b1:
+  id: firefly2006/nemo-synth-b1
+  title: Nemo Synth B1
+  code_file: nemo-synth-b1.ipynb
+  note: "cryptarithm-only synth ~800 (~9%) on v14 backbone"
+  schedule: overnight
+b2:
+  id: firefly2006/nemo-synth-b2
+  title: Nemo Synth B2
+  code_file: nemo-synth-b2.ipynb
+  note: "cryptarithm+bit synth ~1000 (~11%) on v14 backbone"
+  schedule: overnight
+
+# --- C: real-prompt solver-distillation (harrysun2006 / harry) ----------------
+c1:
+  id: harrysun2006/nemo-solver-c1
+  title: Nemo Solver C1
+  code_file: nemo-solver-c1.ipynb
+  note: "verified real-prompt CoT, balanced ~1800 (Idea A)"
+  schedule: overnight
+c2:
+  id: harrysun2006/nemo-solver-c2
+  title: Nemo Solver C2
+  code_file: nemo-solver-c2.ipynb
+  note: "verified real-prompt CoT, hard-cat emphasis ~1000 (Idea D/E)"
+  schedule: overnight
+
+# --- soup: SVD model-soup of v14+c1+b1 -> rank32 (CPU passthrough; NEW BEST 0.86) -
+merge_soup:
+  id: harrysun2006/nemo-merge-soup
+  title: Nemo Merge Soup
+  code_file: nemo-merge-soup.ipynb
+  enable_gpu: false
+  machine_shape: null            # CPU passthrough
+  dataset_sources: [harrysun2006/nemo-merge-soup-adapter]
+  model_sources: []
+  lb: 0.86
+  schedule: daytime
+  note: "weighted SVD soup v14(0.4)+c1(0.3)+b1(0.3); built via lib/svd_merge.py; comparable+complementary -> beat each member"
+
+# --- v11 stage-1: rejection-sampling self-distillation (SAMPLE+FILTER) — post-comp ---
+v11_sample_a:
+  id: harrysun2006/nemo-v11-sample-a2
+  title: Nemo V11 Sample A2
+  code_file: nemo-v11-sample-a.ipynb
+  kernel_sources: [ryanholbrook/nvidia-utility-script]
+  dataset_sources: [harrysun2006/nemo-merge-soup-adapter, mayukh18/nemotron-packages, llkh0a/rtx-wheels]
+  schedule: overnight
+  note: "on-policy sample from base + soup LoRA via vLLM; filter by ground truth; shard 0 (bit/equation/cipher)"
+v11_sample_b:
+  id: firefly2006/nemo-v11-sample-b
+  title: Nemo V11 Sample B
+  code_file: nemo-v11-sample-b.ipynb
+  kernel_sources: [ryanholbrook/nvidia-utility-script]
+  dataset_sources: [mayukh18/nemotron-packages, llkh0a/rtx-wheels]
+  schedule: overnight
+  note: "classic RFT: sample from BASE (no soup; firefly lacks the private soup dataset); shard 1"
+
+# --- EQ-3 / nemo5: equation-specialist (model-training pivot) — post-comp -----
+# Teach the GLOBAL equation cipher (EQ-0/EQ-2': 5-char->1-4-char, hand-crack resisted)
+# by SFT on the real train.csv equation prompts, woven into the v14 replay backbone.
+# Three points: eq_spec (1,555-answer baseline, harry), eq_aug (full 7,775-target
+# coverage, harry), eq_hidose (1,555 x3 dose-only ablation, may). Measured on the
+# late-submission window (100/day); soup-with-v14 candidates to follow.
+eq_spec:
+  id: harrysun2006/nemo-eq-spec
+  title: Nemo EQ Spec
+  code_file: nemo-eq-spec.ipynb
+  note: "equation-specialist: 1,555 real eq prompts -> \\boxed{answer} (answer-only, ~16% dose) on v14 backbone; EQ-3 model pivot"
+  schedule: overnight
+eq_aug:
+  id: harrysun2006/nemo-eq-aug
+  title: Nemo EQ Aug
+  code_file: nemo-eq-aug.ipynb
+  note: "eq-spec + full-coverage rotation: ~7,775 supervised targets (each of a prompt's 5 pairs as query in turn); coverage variant"
+  schedule: overnight
+eq_hidose:
+  id: firefly2006/nemo-eq-hidose
+  title: Nemo EQ Hidose
+  code_file: nemo-eq-hidose.ipynb
+  note: "eq-spec dose-only ablation: same 1,555 targets repeated x3 (~40% dose)"
+  schedule: overnight
+eq_aug_hidose:
+  id: firefly2006/nemo-eq-aug-hidose
+  title: Nemo EQ Aug Hidose
+  code_file: nemo-eq-aug-hidose.ipynb
+  note: "coverage x dose corner: full-rotation ~7,814 targets repeated x2"
+  schedule: overnight
+
+# --- lb1-v1: post-LB1 catalog-method synth on the v14 replay backbone (post-comp) ---
+# v14/b1 training scaffold UNCHANGED; only the synth corpus differs (loaded from an
+# attached dataset = off-kernel-generated signature-catalog cryptarithm + HEX/repair
+# bit + 24-rule equation-numeric traces). dataset_sources must be listed in full
+# (the metadata merge is shallow): the 4 _base datasets + the lb1-v1 corpus.
+lb1_v1:
+  id: harrysun2006/nemo-lb1-v1
+  title: Nemo LB1 V1
+  code_file: nemo-lb1-v1.ipynb
+  dataset_sources:
+    - mayukh18/nemotron-packages
+    - llkh0a/rtx-wheels
+    - huikang/huikang-nemotron-repository-snapshot
+    - mohamedamr992/replay-math
+    - harrysun2006/nemo-lb1-v1-synth
+  schedule: overnight
+  note: "post-LB1 catalog-method synth (~17k: crypt signature-DFS + bit HEX/repair + eq 24-rule) on v14 backbone; method-validation late-window submit"

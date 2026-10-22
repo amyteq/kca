@@ -1,0 +1,59 @@
+# Default permission policy: conservative — SUBMISSION + remote writes ask.
+- operation: kaggle_submit
+  default_decision: ask
+  reason: External leaderboard submission requires human approval.
+  audit_required: true
+- operation: kaggle_push
+  default_decision: ask
+  reason: Pushing a kernel publishes code; requires human approval.
+  audit_required: true
+- operation: git_push
+  default_decision: allow
+  reason: Local-branch pushes are routine in default workflows.
+- operation: gh_pr_create
+  default_decision: allow
+  reason: Opening a PR is reviewable downstream.
+- operation: gh_pr_merge
+  default_decision: ask
+  reason: Merging is irreversible-by-default; gate on human.
+  audit_required: true
+- operation: supabase_migrate
+  default_decision: ask
+  reason: Schema changes against the remote DB require explicit approval.
+  audit_required: true
+- operation: bash
+  default_decision: ask
+  reason: Arbitrary shell is dual-use; gate by default.
+- operation: read_file
+  default_decision: allow
+- operation: write_file
+  default_decision: allow
+- operation: edit_file
+  default_decision: allow
+- operation: create_artifact
+  default_decision: allow
+- operation: run_tests
+  default_decision: allow
+- operation: web_fetch
+  default_decision: allow
+- operation: web_search
+  default_decision: allow
+- operation: litellm_call
+  default_decision: allow
+# M11 — CTF approval operations (ADR-0017). Defaults: ask for executor
+# operations, deny-default for egress (widen the ctf_scopes.target_urls
+# row to widen access).
+- operation: challenge_run
+  default_decision: ask
+  reason: Executing a solver against an authorized CTF target — gate by default.
+  audit_required: true
+- operation: flag_submit
+  default_decision: ask
+  reason: Submitting a flag to a CTF event API — external side effect.
+  audit_required: true
+- operation: network_egress
+  default_decision: deny
+  reason: Egress outside ctf_scopes.target_urls is denied; widen scope row to allow.
+  audit_required: true
+  conditional_allow:
+    when_in_scope: ask   # if request URL ∈ ctf_scopes.target_urls

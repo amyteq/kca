@@ -1,0 +1,122 @@
+__pycache__/
+*.py[cod]
+*.pyc
+*$py.class
+*.egg-info/
+build/
+dist/
+.ipynb_checkpoints
+__pypackages__/
+.env
+**/.env.**
+.DS_Store
+.obsidian
+
+# secrets and credentials — never commit
+secrets
+secrets/
+kaggle.json
+**/kaggle.json
+
+# sandbox-injected read-only dot-files (bind-mounted by Claude Code sandbox)
+.bash_profile
+.bashrc
+.bash_logout
+.gitconfig
+.gitmodules
+.zprofile
+.zshrc
+.profile
+.ripgreprc
+
+# editor / IDE config
+.idea
+.mcp.json
+
+# Claude Code local state
+.claude/commands
+
+# competition data — mount locally, do not commit, EXCEPT for the
+# `data/ctf/` frozen-challenge bundles below (M11-T004). The blanket
+# `data/*` ignore here uses a glob (not `data/`) so a re-include line can
+# re-add `!data/ctf/` — gitignore re-includes do not penetrate a fully-
+# ignored directory.
+data/*
+!data/ctf/
+
+# M11-T004: re-ignore oversize / binary attachments inside data/ctf/. The
+# pre-existing top-level rules (`*.bin`, `*.ckpt`, etc.) still apply.
+data/ctf/*/*/attachments/*.pcap
+data/ctf/*/*/attachments/*.iso
+data/ctf/*/*/attachments/*.img
+# Files >1MB anywhere under data/ctf/ should NOT be committed. There is no
+# native .gitignore size predicate, so this constraint is documented + a
+# pre-commit hook (TODO, filed as M11-followup) will enforce it.
+
+# generated run artifacts and outputs — do not commit unless explicitly reviewed
+artifacts/
+runs/
+# ADR-0023 ledger records: competitions/<slug>/ledger/runs/ and .../artifacts/ hold the
+# Run / Artifact RECORDS — a few hundred bytes of YAML each, naming the bulk output the
+# two rules above exclude. These ARE committed; CI validates them. The negation names the
+# directories themselves, because a re-include cannot reach inside a still-excluded
+# directory (same reason as the data/* + !data/ctf/ pair above).
+!competitions/*/ledger/artifacts/
+!competitions/*/ledger/runs/
+
+# agent audit/transient state — do not commit unless intentionally reviewed
+.agent/
+
+# per-job git worktree workspaces
+.workspaces/
+.claude/worktrees/
+
+# model weights and checkpoints
+*.ckpt
+*.pt
+*.pth
+*.h5
+*.safetensors
+*.gguf
+*.bin
+
+# node
+node_modules/
+
+.jrun
+.kkr
+ext_tools
+events
+memory
+outbox/
+preflight_snapshots/*
+trash/*
+temp/*
+wiki/*
+# Session exports can contain credentials, private prompts and host details.
+# Never commit them, even when an exporter claims to mask known token shapes.
+**/logs/
+**/worklogs/
+**/run/*
+notebooks/generated/*
+
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+._*
+
+# per-job git worktree workspaces (transient; see .claude/worktrees)
+.claude/worktrees/
+
+# rendered page snapshots (PDFs/screenshots of external pages; transient)
+.snapshots/
+
+# Playwright MCP session dumps (console logs / page snapshots; transient)
+.playwright-mcp/
+
+# Third-party article exports are local research inputs, not public source.
+/competitions/nvidia-nemotron/external/*/writeup/raw/
+/competitions/nvidia-nemotron/external/*/writeup/images/

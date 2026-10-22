@@ -1,0 +1,75 @@
+meta:
+  cycle: 2026-06-17 (OW-LADDER-LOOP-001, prompt 07)
+  task: OW-LADDER-LOOP-001
+  submit_decision: SUBMIT x2 ROTATION-FIX (B11, Harry-authorized) — harry 53769740 + may 53769744 (supersede the buggy hybrid_v0 probes 53767016/53767026); both neutral, awaiting episodes
+  new_submissions: {harry: 53769740, may: 53769744}
+  prior_probes_buggy: {harry: 53767016, may: 53767026}
+  rotation_fix: "B11 fixed (planet-phase off-by-one); fixed-v3.2 13.8->45% vs evogen, 0% sun launches; tests 4/4"
+  refresh_status: STALE — fresh ListEpisodes blocked by HTTP 429; see live/agent_status.md + account_status.md for this-cycle (cached) μ
+  note: harry latest2 is v4_scheduler.tar.gz (sub 53730511, μ~700) as of orbit5 2026-06-16, not the main.py entry below; agent_status.md is the authoritative this-cycle slot view
+  execution_safety: clean — 0 strict-sun over 60 cached eps / 10648 launches (FlightOracle audit); no fix_required
+agents:
+  harry:submission_kuni.tar.gz:
+    agent_id: harry:submission_kuni.tar.gz
+    account: harry
+    username: harrysun2006
+    submission_time: null
+    file: submission_kuni.tar.gz
+    version: null
+    slot_order: latest1
+    status: neutral
+    public_lb_mu: 1086.5
+    private_lb: null
+    source: kaggle read-only status
+    last_checked: 2026-06-15 16:00 UTC
+    last_episode_seen: null
+    evidence: null
+    notes: null
+  harry:main.py:
+    agent_id: harry:main.py
+    account: harry
+    username: harrysun2006
+    submission_time: null
+    file: main.py
+    version: null
+    slot_order: latest2
+    status: neutral
+    public_lb_mu: 649.5
+    private_lb: null
+    source: kaggle read-only status
+    last_checked: 2026-06-15 16:00 UTC
+    last_episode_seen: null
+    evidence: null
+    notes: null
+  may:v3_2_coarr.py:
+    agent_id: may:v3_2_coarr.py
+    account: may
+    username: firefly2006
+    submission_time: null
+    file: v3_2_coarr.py
+    version: null
+    slot_order: latest1
+    status: neutral
+    public_lb_mu: 644.0
+    private_lb: null
+    source: kaggle read-only status
+    last_checked: 2026-06-15 16:00 UTC
+    last_episode_seen: null
+    evidence: null
+    notes: null
+  may:main.py:
+    agent_id: may:main.py
+    account: may
+    username: firefly2006
+    submission_time: null
+    file: main.py
+    version: null
+    slot_order: latest2
+    status: neutral
+    public_lb_mu: 630.1
+    private_lb: null
+    source: kaggle read-only status
+    last_checked: 2026-06-15 16:00 UTC
+    last_episode_seen: null
+    evidence: null
+    notes: null
