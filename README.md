@@ -4,6 +4,8 @@ A hybrid human + AI workbench for competitive programming: Kaggle competitions, 
 
 The platform is **local-first and audit-first**. Every research note, experiment, code change, test result, approval, and submission is traceable.
 
+This is a public source snapshot; the original development history is not included. Historical issue and PR links and development automation defaults refer to the private workspace. Set your own repository and notification targets before enabling automation.
+
 ## Two meanings of "code agent"
 
 This project uses two related but distinct concepts.
@@ -119,8 +121,8 @@ M8.5 (pre-M9 hardening) shipped on 2026-05-23 as three PRs (#4 CI repair, #5 eng
 
 ```bash
 # 1. Clone
-git clone https://github.com/<your-org>/kaggle-code-agent.git
-cd kaggle-code-agent
+git clone https://github.com/amyteq/kca.git
+cd kca
 
 # 2. Install Python package (kca CLI)
 pip install -e .

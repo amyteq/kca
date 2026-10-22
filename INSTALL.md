@@ -17,8 +17,8 @@ This guide covers running the KCA platform locally. Cloud deployment instruction
 ## Clone and install
 
 ```bash
-git clone https://github.com/<your-org>/kaggle-code-agent.git
-cd kaggle-code-agent
+git clone https://github.com/amyteq/kca.git
+cd kca
 
 # Install the kca Python package in editable mode
 pip install -e .
